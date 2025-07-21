@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI Authentication System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+            margin-top: 5px;
+        }
+        .success {
+            color: green;
+            margin-top: 5px;
+        }
+        .tabs {
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+        }
+        .tab.active {
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showForm('login')">Login</button>
+            <button class="tab" onclick="showForm('register')">Register</button>
+        </div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="loginUsername">Username:</label>
+                <input type="text" id="loginUsername" required>
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Password:</label>
+                <input type="password" id="loginPassword" required>
+            </div>
+            <button type="submit">Login</button>
+            <div id="loginMessage"></div>
+        </form>
+
+        <form id="registerForm" style="display: none;" onsubmit="handleRegister(event)">
+            <div class="form-group">
+                <label for="registerUsername">Username:</label>
+                <input type="text" id="registerUsername" required>
+            </div>
+            <div class="form-group">
+                <label for="registerEmail">Email:</label>
+                <input type="email" id="registerEmail" required>
+            </div>
+            <div class="form-group">
+                <label for="registerPassword">Password:</label>
+                <input type="password" id="registerPassword" required>
+            </div>
+            <button type="submit">Register</button>
+            <div id="registerMessage"></div>
+        </form>
+    </div>
+
+    <script>
+        function showForm(formType) {
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const tabs = document.querySelectorAll('.tab');
+
+            if (formType === 'login') {
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
+                tabs[0].classList.add('active');
+                tabs[1].classList.remove('active');
+            } else {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'block';
+                tabs[0].classList.remove('active');
+                tabs[1].classList.add('active');
+            }
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const messageDiv = document.getElementById('loginMessage');
+
+            try {
+                const response = await fetch('/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageDiv.className = 'success';
+                    messageDiv.textContent = 'Login successful!';
+                    localStorage.setItem('token', data.access_token);
+                    window.location.href = '/users/me';
+                } else {
+                    messageDiv.className = 'error';
+                    messageDiv.textContent = data.detail || 'Login failed';
+                }
+            } catch (error) {
+                messageDiv.className = 'error';
+                messageDiv.textContent = 'An error occurred';
+            }
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const messageDiv = document.getElementById('registerMessage');
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageDiv.className = 'success';
+                    messageDiv.textContent = 'Registration successful! Please login.';
+                    setTimeout(() => showForm('login'), 2000);
+                } else {
+                    messageDiv.className = 'error';
+                    messageDiv.textContent = data.detail || 'Registration failed';
+                }
+            } catch (error) {
+                messageDiv.className = 'error';
+                messageDiv.textContent = 'An error occurred';
+            }
+        }
+    </script>
+</body>
+</html>
