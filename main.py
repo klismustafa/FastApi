@@ -18,15 +18,12 @@ from auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
-# Create database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Configure templates
 templates = Jinja2Templates(directory="templates")
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,7 +38,6 @@ async def read_root(request: Request):
 
 @app.post("/register", response_model=Token)
 async def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    # Check if username exists
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
         raise HTTPException(
@@ -49,7 +45,6 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
             detail="Username already registered"
         )
     
-    # Check if email exists
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(
@@ -57,7 +52,6 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
-    # Create new user
     hashed_password = get_password_hash(user.password)
     db_user = User(
         username=user.username,
@@ -68,7 +62,6 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     
-    # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
