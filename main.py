@@ -1,11 +1,12 @@
 from datetime import timedelta
 from typing import List
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Form
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.security import OAuth2PasswordRequestForm
 
 from database import get_db, engine
 from schemas import UserCreate, UserLogin, Token, UserResponse
@@ -39,29 +40,29 @@ app.add_middleware(
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.post("/register", response_model=Token)
-async def register_user(user: UserCreate, db: Session = Depends(get_db)):
+@app.post("/register")
+async def register_user(username: str = Form(...), email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     # Check if username exists
-    db_user = db.query(User).filter(User.username == user.username).first()
+    db_user = db.query(User).filter(User.username == username).first()
     if db_user:
-        raise HTTPException(
+        return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
+            content={"detail": "Username already registered"}
         )
     
     # Check if email exists
-    db_user = db.query(User).filter(User.email == user.email).first()
+    db_user = db.query(User).filter(User.email == email).first()
     if db_user:
-        raise HTTPException(
+        return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            content={"detail": "Email already registered"}
         )
     
     # Create new user
-    hashed_password = get_password_hash(user.password)
+    hashed_password = get_password_hash(password)
     db_user = User(
-        username=user.username,
-        email=user.email,
+        username=username,
+        email=email,
         hashed_password=hashed_password
     )
     db.add(db_user)
@@ -71,14 +72,14 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/token", response_model=Token)
-async def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = authenticate_user(db, user.username, user.password)
-    if not db_user:
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -86,7 +87,7 @@ async def login(user: UserLogin, db: Session = Depends(get_db)):
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": form_data.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
