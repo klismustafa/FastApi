@@ -20,3 +20,5 @@ MAIL_SERVER=smtp.gmail.com
 MAIL_STARTTLS=False
 
 MAIL_SSL_TLS=True
+
+To initialise the FASTAPI use uvicorn main:app --reload in terminal
