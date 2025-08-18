@@ -8,4 +8,6 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
+    is_verified = Column(Integer, default=0)
+    verification_token = Column(String, unique=True, nullable=True)
     

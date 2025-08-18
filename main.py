@@ -16,18 +16,17 @@ from auth import (
     create_access_token,
     get_current_user,
     get_password_hash,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    generate_verification_token,
+    send_verification_email
 )
 
-# Create database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Configure templates
 templates = Jinja2Templates(directory="templates")
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,7 +41,6 @@ async def read_root(request: Request):
 
 @app.post("/register")
 async def register_user(username: str = Form(...), email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    # Check if username exists
     db_user = db.query(User).filter(User.username == username).first()
     if db_user:
         return JSONResponse(
@@ -50,7 +48,6 @@ async def register_user(username: str = Form(...), email: str = Form(...), passw
             content={"detail": "Username already registered"}
         )
     
-    # Check if email exists
     db_user = db.query(User).filter(User.email == email).first()
     if db_user:
         return JSONResponse(
@@ -58,23 +55,31 @@ async def register_user(username: str = Form(...), email: str = Form(...), passw
             content={"detail": "Email already registered"}
         )
     
-    # Create new user
+    # Generate verification token
+    verification_token = generate_verification_token()
+    
     hashed_password = get_password_hash(password)
     db_user = User(
         username=username,
         email=email,
-        hashed_password=hashed_password
+        hashed_password=hashed_password,
+        is_verified=0,
+        verification_token=verification_token
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     
-    # Create access token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": username}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Send verification email
+    try:
+        await send_verification_email(email, verification_token)
+        print(f"Verification email sent to {email} with token {verification_token}")
+    except Exception as e:
+        print(f"Failed to send verification email: {e}")
+        # For development, print the verification URL
+        print(f"Verification URL: http://localhost:8000/verify/{verification_token}")
+    
+    return {"message": "Registration successful. Please check your email to verify your account."}
 
 @app.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -85,6 +90,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Please verify your email before logging in",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": form_data.username}, expires_delta=access_token_expires
@@ -94,3 +107,20 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@app.get("/verify/{token}")
+async def verify_email(token: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.verification_token == token).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid verification token"
+        )
+    
+    if user.is_verified:
+        return {"message": "Email already verified"}
+    
+    user.is_verified = 1
+    user.verification_token = None
+    db.commit()
+    return {"message": "Email verified successfully"}

@@ -104,9 +104,22 @@
             <button type="submit">Register</button>
             <div id="registerMessage"></div>
         </form>
+
+        <div id="profile" style="display: none;">
+            <h2>Welcome, <span id="username"></span>!</h2>
+            <p>Email: <span id="email"></span></p>
+            <button onclick="logout()">Logout</button>
+        </div>
     </div>
 
     <script>
+        window.onload = () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                showProfile();
+            }
+        };
+
         function showForm(formType) {
             const loginForm = document.getElementById('loginForm');
             const registerForm = document.getElementById('registerForm');
@@ -143,7 +156,7 @@
                     messageDiv.className = 'success';
                     messageDiv.textContent = 'Login successful!';
                     localStorage.setItem('token', data.access_token);
-                    window.location.href = '/users/me';
+                    showProfile();
                 } else {
                     messageDiv.className = 'error';
                     messageDiv.textContent = data.detail || 'Login failed';
@@ -170,8 +183,8 @@
 
                 if (response.ok) {
                     messageDiv.className = 'success';
-                    messageDiv.textContent = 'Registration successful! Please login.';
-                    setTimeout(() => showForm('login'), 2000);
+                    messageDiv.textContent = data.message || 'Registration successful! Please check your email to verify your account.';
+                    setTimeout(() => showForm('login'), 3000);
                 } else {
                     messageDiv.className = 'error';
                     messageDiv.textContent = data.detail || 'Registration failed';
@@ -180,6 +193,57 @@
                 messageDiv.className = 'error';
                 messageDiv.textContent = 'An error occurred';
             }
+        }
+
+        async function showProfile() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'none';
+            document.querySelector('.tabs').style.display = 'none';
+            document.getElementById('profile').style.display = 'block';
+            await getProfile();
+        }
+
+        async function getProfile() {
+            const token = localStorage.getItem('token');
+            const messageDiv = document.getElementById('loginMessage');
+
+            if (!token) {
+                logout();
+                return;
+            }
+
+            try {
+                const response = await fetch('/users/me', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('username').textContent = data.username;
+                    document.getElementById('email').textContent = data.email;
+                } else {
+                    messageDiv.className = 'error';
+                    messageDiv.textContent = data.detail || 'Failed to fetch profile';
+                    logout();
+                }
+            } catch (error) {
+                messageDiv.className = 'error';
+                messageDiv.textContent = 'An error occurred while fetching profile';
+                logout();
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            document.getElementById('loginForm').style.display = 'block';
+            document.querySelector('.tabs').style.display = 'block';
+            document.getElementById('profile').style.display = 'none';
+            document.getElementById('loginMessage').textContent = '';
+            showForm('login');
         }
     </script>
 </body>
