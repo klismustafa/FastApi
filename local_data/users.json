@@ -1,0 +1,10 @@
+[
+  {
+    "username": "legend",
+    "email": "klismustafa@gmail.com",
+    "hashed_password": "289689452d5a6e76f011ea28868479bc4eba3cd6c5b9c616ffb4a31823f00bea81d0489bfc00fec92ad0690174a9cd05",
+    "is_verified": 1,
+    "verification_token": null,
+    "id": 1
+  }
+]

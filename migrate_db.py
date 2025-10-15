@@ -13,7 +13,7 @@ print("Created tables if they didn't exist")
 conn = sqlite3.connect('./users.db')
 cursor = conn.cursor()
 
-# Add the missing columns
+# Add the missing columns if they don't exist
 try:
     cursor.execute('ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0')
     print("Added is_verified column")
