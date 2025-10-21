@@ -432,7 +432,10 @@
                     alert('Review submitted successfully!');
                 } else {
                     const error = await response.json();
-                    alert(error.detail || 'Failed to submit review');
+                    const msg = Array.isArray(error.detail)
+                        ? error.detail.map(d => d.msg || JSON.stringify(d)).join('\n')
+                        : (error.detail || JSON.stringify(error));
+                    alert(msg);
                 }
             } catch (error) {
                 console.error('Error submitting review:', error);

@@ -230,57 +230,78 @@ async def list_restaurants(
 
 @app.post("/reviews/")
 async def create_review(
-    text: str = Form(...),
-    rating: int = Form(...),
-    restaurant_id: int = Form(...),
+    request: Request,
+    comment: str = Form(...),
+    rating: str = Form(...),
+    restaurant_id: str = Form(...),
     image: UploadFile = File(None),
     current_user: Dict = Depends(get_verified_user)
 ):
-    # Validate rating
-    if rating < 1 or rating > 5:
+    # Log the received data for debugging
+    print(f"Received review data: comment={comment}, rating={rating}, restaurant_id={restaurant_id}")
+    
+    # Convert rating to integer
+    try:
+        rating_int = int(rating)
+    except ValueError:
+        print(f"Invalid rating format: {rating}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid rating format: {rating}"
+        )
+    if rating_int < 1 or rating_int > 5:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Rating must be between 1 and 5"
         )
-    
+
+    # Convert restaurant_id to integer
+    try:
+        restaurant_id_int = int(restaurant_id)
+    except ValueError:
+        print(f"Invalid restaurant_id format: {restaurant_id}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid restaurant_id format: {restaurant_id}"
+        )
+
     # Check if restaurant exists
-    restaurant = local_storage.get_restaurant_by_id(restaurant_id)
+    restaurant = local_storage.get_restaurant_by_id(restaurant_id_int)
     if not restaurant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found"
         )
-    
+
     image_url = None
     if image and image.filename:
-        # Validate image
-        if image.size > 5 * 1024 * 1024:  # 5MB limit
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Image size must be less than 5MB"
-            )
-        
         if not image.content_type.startswith('image/'):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="File must be an image"
             )
-        
-        # Save image locally
         try:
             image_data = await image.read()
+            # Enforce 5MB limit based on actual bytes
+            if len(image_data) > 5 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Image size must be less than 5MB"
+                )
             image_url = await local_storage.save_file(image_data, image.filename, image.content_type)
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to save image: {str(e)}"
             )
-    
+
     # Create review
     review_data = {
-        "text": text,
-        "rating": rating,
-        "restaurant_id": restaurant_id,
+        "text": comment,
+        "rating": rating_int,
+        "restaurant_id": restaurant_id_int,
         "user_id": current_user["id"],
         "image_url": image_url
     }
